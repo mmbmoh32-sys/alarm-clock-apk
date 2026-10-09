@@ -256,8 +256,9 @@ fun AlarmAppContent(viewModel: AlarmViewModel) {
             // Dialogs
             if (showPrayersDialog) {
                 PrayerTimesDialog(
-                    prefs = viewModel.prefs,
+                    viewModel = viewModel,
                     is24Hour = is24Hour,
+                    soundManager = viewModel.soundManager,
                     onDismiss = { showPrayersDialog = false }
                 )
             }

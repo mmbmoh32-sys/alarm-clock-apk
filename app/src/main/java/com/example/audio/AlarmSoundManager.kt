@@ -3,10 +3,8 @@ package com.example.audio
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
-import android.media.AudioManager
 import android.media.AudioTrack
 import android.os.Build
-import android.os.CombinedVibration
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
@@ -81,7 +79,7 @@ class AlarmSoundManager(private val context: Context) {
                 val maxVolume = 1.0f
 
                 var cycle = 0
-                val maxCycles = if (isPreview) 3 else Int.MAX_VALUE
+                val maxCycles = if (isPreview) 4 else Int.MAX_VALUE
 
                 while (isActive && isPlaying && cycle < maxCycles) {
                     val elapsedTime = System.currentTimeMillis() - startTime
@@ -101,7 +99,7 @@ class AlarmSoundManager(private val context: Context) {
 
                     cycle++
                     if (isPreview && cycle >= maxCycles) break
-                    delay(100)
+                    delay(80)
                 }
 
                 track.stop()
@@ -126,6 +124,12 @@ class AlarmSoundManager(private val context: Context) {
             "waves" -> 1.5
             "gentle" -> 1.0
             "classic" -> 0.6
+            // Athan styles
+            "athan_makkah" -> 1.8 // Maqam Bayati solemn resonant tone
+            "athan_madinah" -> 1.6 // Maqam Rast gentle melody
+            "athan_aqsa" -> 1.8 // Maqam Hijaz soulful melody
+            "athan_cairo" -> 1.7 // Traditional Egyptian melody
+            "athan_gentle" -> 1.2 // Takbeerat chime
             else -> 0.5 // digital
         }
         val numSamples = (durationSeconds * sampleRate).toInt()
@@ -133,39 +137,52 @@ class AlarmSoundManager(private val context: Context) {
 
         val frequencies = when (soundId) {
             "radar" -> listOf(880.0, 1174.0)
-            "dawn" -> listOf(523.25, 659.25, 783.99, 1046.50) // C5, E5, G5, C6 arpeggio
+            "dawn" -> listOf(523.25, 659.25, 783.99, 1046.50)
             "waves" -> listOf(440.0, 554.37)
             "gentle" -> listOf(587.33, 659.25, 783.99, 880.0)
             "classic" -> listOf(800.0, 950.0)
+            // Distinctive Maqam vocal approximations for Muadhin sounds
+            "athan_makkah" -> listOf(293.66, 329.63, 349.23, 392.00, 349.23, 293.66) // D4, E4, F4, G4 Bayati
+            "athan_madinah" -> listOf(261.63, 293.66, 329.63, 349.23, 392.00) // C4, D4, E4, F4 Rast
+            "athan_aqsa" -> listOf(293.66, 311.13, 369.99, 392.00, 311.13, 293.66) // D4, Eb4, F#4, G4 Hijaz
+            "athan_cairo" -> listOf(349.23, 392.00, 415.30, 523.25, 392.00) // Traditional Cairo
+            "athan_gentle" -> listOf(392.00, 440.00, 523.25, 659.25) // Peaceful Takbeerat
             else -> listOf(880.0, 880.0) // Digital beep
         }
 
         for (i in 0 until numSamples) {
             val t = i.toDouble() / sampleRate
             val freqIndex = ((t * frequencies.size / durationSeconds).toInt()) % frequencies.size
-            val freq = frequencies[freqIndex]
+            val baseFreq = frequencies[freqIndex]
 
-            // Envelope to avoid popping and add natural tone
-            val env = when (soundId) {
-                "radar" -> {
+            val isAthan = soundId.startsWith("athan_")
+
+            val env = when {
+                soundId == "radar" -> {
                     val subT = (t * 2) % 1.0
                     (1.0 - subT).coerceIn(0.0, 1.0)
                 }
-                "dawn" -> {
-                    sin(Math.PI * (t / durationSeconds)).coerceIn(0.0, 1.0)
-                }
-                "waves" -> {
-                    0.5 * (1.0 + sin(2 * Math.PI * 0.8 * t))
+                soundId == "dawn" -> sin(Math.PI * (t / durationSeconds)).coerceIn(0.0, 1.0)
+                soundId == "waves" -> 0.5 * (1.0 + sin(2 * Math.PI * 0.8 * t))
+                isAthan -> {
+                    // Smooth singing envelope with vibrato
+                    val segmentDuration = durationSeconds / frequencies.size
+                    val segmentT = (t % segmentDuration) / segmentDuration
+                    sin(Math.PI * segmentT).coerceIn(0.0, 1.0)
                 }
                 else -> {
-                    // Digital beep beep
                     val beepPhase = (t * 4) % 1.0
                     if (beepPhase < 0.6) 1.0 else 0.0
                 }
             }
 
-            val sample = sin(2.0 * Math.PI * freq * t) * env * 0.7
-            buffer[i] = (sample * Short.MAX_VALUE).toInt().toShort()
+            // Add subtle warm overtone for athan voices
+            val vibrato = if (isAthan) 1.0 + 0.015 * sin(2 * Math.PI * 5.5 * t) else 1.0
+            val harmonic = if (isAthan) 0.3 * sin(2.0 * Math.PI * (baseFreq * 2.0) * vibrato * t) else 0.0
+            val fundamental = sin(2.0 * Math.PI * baseFreq * vibrato * t)
+
+            val sample = (fundamental + harmonic) * env * 0.65
+            buffer[i] = (sample.coerceIn(-1.0, 1.0) * Short.MAX_VALUE).toInt().toShort()
         }
 
         return buffer

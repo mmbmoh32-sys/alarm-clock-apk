@@ -31,9 +31,9 @@ data class Alarm(
     fun getFormattedDaysArabic(): String {
         val days = getDaysList()
         if (days.isEmpty()) return "مرة واحدة"
-        if (days.size == 7) return "كل يوم"
-        if (days.size == 5 && days.containsAll(listOf(1, 2, 3, 4, 5))) return "أيام العمل (الأحد - الخميس)"
-        if (days.size == 2 && days.containsAll(listOf(6, 7))) return "عطلة نهاية الأسبوع (الجمعة والسبت)"
+        if (days.size == 7) return "يومياً"
+        if (days.size == 5 && days.containsAll(listOf(1, 2, 3, 4, 5))) return "الأحد - الخميس"
+        if (days.size == 2 && days.containsAll(listOf(6, 7))) return "الجمعة والسبت"
         
         val dayNames = mapOf(
             1 to "أحد",
@@ -50,20 +50,25 @@ data class Alarm(
     fun getSoundDisplayName(): String {
         return when (soundId) {
             "digital" -> "رقمي كلاسيكي"
-            "radar" -> "رادار سريع"
+            "athan_makkah" -> "أذان مكة المكرمة"
+            "athan_madinah" -> "أذان المدينة المنورة"
+            "athan_aqsa" -> "أذان المسجد الأقصى"
+            "athan_cairo" -> "أذان مصر التاريخي"
+            "athan_gentle" -> "تكبيرات هادئة"
+            "radar" -> "رادار نشط"
             "dawn" -> "أجراس الفجر"
             "waves" -> "أمواج هادئة"
-            "classic" -> "جرس قديم"
+            "classic" -> "جرس تقليدي"
             "gentle" -> "لحن الصباح"
-            else -> "رقمي"
+            else -> "رقمي كلاسيكي"
         }
     }
 
     fun getMissionDisplayName(): String {
         return when (missionType) {
-            "MATH" -> "معادلة رياضية"
-            "SHAKE" -> "هز الهاتف"
-            "TYPING" -> "كتابة جملة"
+            "MATH" -> "مسألة حسابية"
+            "SHAKE" -> "هز الجهاز"
+            "TYPING" -> "كتابة عبارة"
             else -> "بدون مهمة"
         }
     }

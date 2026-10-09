@@ -78,13 +78,14 @@ fun AlarmScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "المنبهات الخاصة بك",
+                        text = "المنبهات المجدولة",
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = Color.White
                     )
 
+                    val activeCount = alarms.count { it.isEnabled }
                     Text(
-                        text = "${alarms.count { it.isEnabled }} من ${alarms.size} مفعّل",
+                        text = "$activeCount نشط من ${alarms.size}",
                         style = MaterialTheme.typography.labelMedium,
                         color = TextSecondaryDark
                     )

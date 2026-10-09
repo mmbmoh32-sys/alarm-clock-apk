@@ -50,4 +50,40 @@ class PreferencesManager(context: Context) {
     var selectedPrayerCityId: String
         get() = prefs.getString("prayer_city_id", "makkah") ?: "makkah"
         set(value) = prefs.edit().putString("prayer_city_id", value).apply()
+
+    // Location & GPS Settings
+    var isUseGpsLocation: Boolean
+        get() = prefs.getBoolean("prayer_use_gps", true)
+        set(value) = prefs.edit().putBoolean("prayer_use_gps", value).apply()
+
+    var userLatitude: Double
+        get() = java.lang.Double.longBitsToDouble(prefs.getLong("prayer_user_lat", java.lang.Double.doubleToLongBits(21.4225)))
+        set(value) = prefs.edit().putLong("prayer_user_lat", java.lang.Double.doubleToLongBits(value)).apply()
+
+    var userLongitude: Double
+        get() = java.lang.Double.longBitsToDouble(prefs.getLong("prayer_user_lng", java.lang.Double.doubleToLongBits(39.8262)))
+        set(value) = prefs.edit().putLong("prayer_user_lng", java.lang.Double.doubleToLongBits(value)).apply()
+
+    var locationDisplayName: String
+        get() = prefs.getString("prayer_location_name", "مكة المكرمة (الموقع الافتراضي)") ?: "مكة المكرمة"
+        set(value) = prefs.edit().putString("prayer_location_name", value).apply()
+
+    // Prayer Athan Alert settings
+    fun isPrayerAthanEnabled(prayerId: String): Boolean {
+        // Sunrise is default off for athan, others default on
+        val defaultVal = prayerId != "sunrise"
+        return prefs.getBoolean("athan_enabled_$prayerId", defaultVal)
+    }
+
+    fun setPrayerAthanEnabled(prayerId: String, enabled: Boolean) {
+        prefs.edit().putBoolean("athan_enabled_$prayerId", enabled).apply()
+    }
+
+    fun getPrayerMuadhin(prayerId: String): String {
+        return prefs.getString("athan_muadhin_$prayerId", "athan_makkah") ?: "athan_makkah"
+    }
+
+    fun setPrayerMuadhin(prayerId: String, muadhinId: String) {
+        prefs.edit().putString("athan_muadhin_$prayerId", muadhinId).apply()
+    }
 }

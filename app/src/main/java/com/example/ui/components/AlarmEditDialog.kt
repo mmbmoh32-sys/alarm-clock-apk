@@ -68,6 +68,11 @@ fun AlarmEditDialog(
 
     val soundOptions = listOf(
         "digital" to "رقمي كلاسيكي 🔔",
+        "athan_makkah" to "أذان الحرم المكي 🕋",
+        "athan_madinah" to "أذان المسجد النبوي 🕌",
+        "athan_aqsa" to "أذان المسجد الأقصى 🇵🇸",
+        "athan_cairo" to "أذان مصر التاريخي 🇪🇬",
+        "athan_gentle" to "تكبيرات وأذان هادئ 🕊️",
         "radar" to "رادار نشط ⚡",
         "dawn" to "أجراس الفجر 🕌",
         "waves" to "أمواج هادئة 🌊",
@@ -76,10 +81,10 @@ fun AlarmEditDialog(
     )
 
     val missionOptions = listOf(
-        "NONE" to "بدون مهمة",
-        "MATH" to "معادلة رياضية 🧮",
-        "SHAKE" to "هز الهاتف 📱",
-        "TYPING" to "كتابة جملة ✍️"
+        "NONE" to "بدون مهمة (إيقاف مباشر)",
+        "MATH" to "مسألة حسابية 🧮",
+        "SHAKE" to "هز الجهاز 📱",
+        "TYPING" to "كتابة عبارة ✍️"
     )
 
     Dialog(

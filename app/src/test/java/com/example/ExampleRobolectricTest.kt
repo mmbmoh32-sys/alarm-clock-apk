@@ -45,10 +45,18 @@ class ExampleRobolectricTest {
     @Test
     fun `test alarm days formatting`() {
         val dailyAlarm = Alarm(hour = 7, minute = 0, daysOfWeek = "1,2,3,4,5,6,7")
-        assertEquals("كل يوم", dailyAlarm.getFormattedDaysArabic())
+        assertEquals("يومياً", dailyAlarm.getFormattedDaysArabic())
 
         val onceAlarm = Alarm(hour = 7, minute = 0, daysOfWeek = "")
         assertEquals("مرة واحدة", onceAlarm.getFormattedDaysArabic())
+    }
+
+    @Test
+    fun `test prayer times calculation with GPS coordinates and muadhins`() {
+        val prayers = PrayerTimesCalculator.calculatePrayers(24.7136, 46.6753, false)
+        assertEquals(6, prayers.size)
+        val fajr = prayers.first { it.id == "fajr" }
+        assertNotNull(fajr.getMuadhinDisplayName())
     }
 
     @Test

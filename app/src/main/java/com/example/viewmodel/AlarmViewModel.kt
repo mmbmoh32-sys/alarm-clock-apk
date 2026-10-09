@@ -1,6 +1,7 @@
 package com.example.viewmodel
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.audio.AlarmSoundManager
@@ -8,7 +9,9 @@ import com.example.data.Alarm
 import com.example.data.AppDatabase
 import com.example.data.PreferencesManager
 import com.example.data.TimerPreset
-import com.example.util.TimeFormatter
+import com.example.util.LocationHelper
+import com.example.util.PrayerTime
+import com.example.util.PrayerTimesCalculator
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -46,13 +49,27 @@ class AlarmViewModel(application: Application) : AndroidViewModel(application) {
     private val _themeMode = MutableStateFlow(prefs.themeMode)
     val themeMode: StateFlow<String> = _themeMode.asStateFlow()
 
+    // Location & Prayer state
+    private val _userLat = MutableStateFlow(prefs.userLatitude)
+    val userLat: StateFlow<Double> = _userLat.asStateFlow()
+
+    private val _userLng = MutableStateFlow(prefs.userLongitude)
+    val userLng: StateFlow<Double> = _userLng.asStateFlow()
+
+    private val _locationDisplayName = MutableStateFlow(prefs.locationDisplayName)
+    val locationDisplayName: StateFlow<String> = _locationDisplayName.asStateFlow()
+
+    private val _prayerTimesState = MutableStateFlow<List<PrayerTime>>(emptyList())
+    val prayerTimesState: StateFlow<List<PrayerTime>> = _prayerTimesState.asStateFlow()
+
     private var lastTriggeredMinute = -1
 
     init {
         viewModelScope.launch {
             seedDefaultsIfEmpty()
+            refreshPrayerTimes()
         }
-        // Background loop to check for alarm trigger time every 5 seconds
+        // Background loop to check for alarm & athan triggers every 5 seconds
         viewModelScope.launch {
             while (true) {
                 checkAlarmsTrigger()
@@ -81,7 +98,7 @@ class AlarmViewModel(application: Application) : AndroidViewModel(application) {
                     label = "استيقاظ لصلاة الفجر 🕌",
                     daysOfWeek = "1,2,3,4,5,6,7",
                     snoozeMinutes = 10,
-                    soundId = "dawn",
+                    soundId = "athan_makkah",
                     isVibrate = true,
                     isVolumeGradual = true,
                     missionType = "MATH",
@@ -106,11 +123,22 @@ class AlarmViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun refreshPrayerTimes() {
+        val list = PrayerTimesCalculator.calculatePrayers(
+            lat = _userLat.value,
+            lng = _userLng.value,
+            is24Hour = _is24HourFormat.value,
+            athanEnabledProvider = { prefs.isPrayerAthanEnabled(it) },
+            muadhinProvider = { prefs.getPrayerMuadhin(it) }
+        )
+        _prayerTimesState.value = list
+    }
+
     private fun checkAlarmsTrigger() {
         val now = LocalDateTime.now()
         val currentMinuteOfDay = now.hour * 60 + now.minute
 
-        if (currentMinuteOfDay == lastTriggeredMinute) return // Already triggered this minute
+        if (currentMinuteOfDay == lastTriggeredMinute) return
 
         val currentDayModel = when (now.dayOfWeek) {
             DayOfWeek.SUNDAY -> 1
@@ -122,6 +150,7 @@ class AlarmViewModel(application: Application) : AndroidViewModel(application) {
             DayOfWeek.SATURDAY -> 7
         }
 
+        // 1. Check Standard Alarms
         val activeList = alarms.value.filter { it.isEnabled }
         for (alarm in activeList) {
             if (alarm.hour == now.hour && alarm.minute == now.minute) {
@@ -129,7 +158,30 @@ class AlarmViewModel(application: Application) : AndroidViewModel(application) {
                 if (days.isEmpty() || days.contains(currentDayModel)) {
                     lastTriggeredMinute = currentMinuteOfDay
                     triggerAlarmRinging(alarm)
-                    break
+                    return
+                }
+            }
+        }
+
+        // 2. Check Prayer Athan Alerts
+        val currentPrayers = _prayerTimesState.value
+        for (prayer in currentPrayers) {
+            if (prayer.isAthanEnabled && prayer.id != "sunrise") {
+                if (prayer.time.hour == now.hour && prayer.time.minute == now.minute) {
+                    lastTriggeredMinute = currentMinuteOfDay
+                    val athanAlarm = Alarm(
+                        id = 888800L + prayer.id.hashCode(),
+                        hour = prayer.time.hour,
+                        minute = prayer.time.minute,
+                        isEnabled = true,
+                        label = "حان الآن موعد أذان ${prayer.nameAr} 🕌",
+                        soundId = prayer.muadhinId,
+                        isVibrate = true,
+                        isVolumeGradual = false,
+                        missionType = "NONE"
+                    )
+                    triggerAlarmRinging(athanAlarm)
+                    return
                 }
             }
         }
@@ -150,8 +202,7 @@ class AlarmViewModel(application: Application) : AndroidViewModel(application) {
         soundManager.stop()
         _ringingAlarm.value = null
 
-        if (current != null && !current.isRepeating()) {
-            // Turn off one-time alarm after it rings
+        if (current != null && current.id < 880000L && !current.isRepeating()) {
             viewModelScope.launch {
                 alarmDao.setAlarmEnabled(current.id, false)
             }
@@ -163,15 +214,16 @@ class AlarmViewModel(application: Application) : AndroidViewModel(application) {
         soundManager.stop()
         _ringingAlarm.value = null
 
-        viewModelScope.launch {
-            // Set alarm for snoozeMinutes later
-            val now = LocalTime.now().plusMinutes(current.snoozeMinutes.toLong())
-            val snoozedAlarm = current.copy(
-                hour = now.hour,
-                minute = now.minute,
-                currentSnoozeCount = current.currentSnoozeCount + 1
-            )
-            alarmDao.updateAlarm(snoozedAlarm)
+        if (current.id < 880000L) {
+            viewModelScope.launch {
+                val now = LocalTime.now().plusMinutes(current.snoozeMinutes.toLong())
+                val snoozedAlarm = current.copy(
+                    hour = now.hour,
+                    minute = now.minute,
+                    currentSnoozeCount = current.currentSnoozeCount + 1
+                )
+                alarmDao.updateAlarm(snoozedAlarm)
+            }
         }
     }
 
@@ -220,9 +272,66 @@ class AlarmViewModel(application: Application) : AndroidViewModel(application) {
         prefs.favoriteCityIds = current
     }
 
+    fun requestGpsLocation(context: Context, onComplete: ((Boolean, String) -> Unit)? = null) {
+        LocationHelper.fetchCurrentLocation(
+            context = context,
+            onSuccess = { lat, lng, cityName ->
+                _userLat.value = lat
+                _userLng.value = lng
+                _locationDisplayName.value = cityName
+                prefs.userLatitude = lat
+                prefs.userLongitude = lng
+                prefs.locationDisplayName = cityName
+                refreshPrayerTimes()
+                onComplete?.invoke(true, cityName)
+            },
+            onError = { errorMsg ->
+                onComplete?.invoke(false, errorMsg)
+            }
+        )
+    }
+
+    fun setPrayerCityPreset(cityId: String) {
+        val coords = PrayerTimesCalculator.cityCoordinates[cityId]
+        val cityName = when (cityId) {
+            "makkah" -> "مكة المكرمة"
+            "madinah" -> "المدينة المنورة"
+            "jerusalem" -> "القدس الشريف"
+            "cairo" -> "القاهرة"
+            "riyadh" -> "الرياض"
+            "dubai" -> "دبي"
+            "amman" -> "عمّان"
+            "doha" -> "الدوحة"
+            "kuwait" -> "الكويت"
+            "london" -> "لندن"
+            else -> "مكة المكرمة"
+        }
+        if (coords != null) {
+            _userLat.value = coords.first
+            _userLng.value = coords.second
+            _locationDisplayName.value = cityName
+            prefs.userLatitude = coords.first
+            prefs.userLongitude = coords.second
+            prefs.locationDisplayName = cityName
+            prefs.selectedPrayerCityId = cityId
+            refreshPrayerTimes()
+        }
+    }
+
+    fun togglePrayerAthan(prayerId: String, isEnabled: Boolean) {
+        prefs.setPrayerAthanEnabled(prayerId, isEnabled)
+        refreshPrayerTimes()
+    }
+
+    fun setPrayerMuadhin(prayerId: String, muadhinId: String) {
+        prefs.setPrayerMuadhin(prayerId, muadhinId)
+        refreshPrayerTimes()
+    }
+
     fun refreshPreferences() {
         _is24HourFormat.value = prefs.is24HourFormat
         _themeMode.value = prefs.themeMode
+        refreshPrayerTimes()
     }
 
     override fun onCleared() {
