@@ -1,0 +1,6 @@
+{
+  "name": "منبّه",
+  "description": "تطبيق منبه متكامل وذكي باللغة العربية مع مهام استيقاظ، ساعة عالمية، مؤقت، وساعة إيقاف",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
